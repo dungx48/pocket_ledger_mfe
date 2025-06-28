@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 interface Transaction {
   id?: string;
@@ -11,7 +12,7 @@ interface Transaction {
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
-  private apiUrl = 'http://15.235.185.158:5001/transactions';
+  private apiUrl = `${environment.apiUrl}/transactions`;
   constructor(private http: HttpClient) {}
 
   list(): Observable<Transaction[]> {

@@ -1,21 +1,41 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
-interface LoginResp { access_token: string; }
+interface LoginResp {
+  access_token: string;
+  token_type: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private apiUrl = 'http://15.235.185.158:5001'; // thay bằng URL thực
+  private apiUrl = environment.apiUrl;
+
   constructor(private http: HttpClient) {}
 
   login(username: string, password: string) {
-    return this.http.post<LoginResp>(
-      `${this.apiUrl}/auth/token`,
-      { username, password }
-    ).pipe(
-      tap(res => localStorage.setItem('token', res.access_token))
-    );
+    // FastAPI OAuth2PasswordRequestForm chỉ nhận x-www-form-urlencoded
+    const body = new HttpParams()
+      .set('username', username)
+      .set('password', password);
+    
+    return this.http
+      .post<LoginResp>(
+        `${this.apiUrl}/auth/token`,
+        body.toString(),
+        {
+          headers: new HttpHeaders({
+            'Content-Type': 'application/x-www-form-urlencoded'
+          })
+        }
+      )
+      .pipe(
+        tap(res => {
+          // lưu token
+          localStorage.setItem('token', res.access_token);
+        })
+      );
   }
 
   logout() {
