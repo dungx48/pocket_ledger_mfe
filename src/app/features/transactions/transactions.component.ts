@@ -2,10 +2,8 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-transactions',
-  imports: [],
-  templateUrl: './transactions.html',
-  styleUrl: './transactions.scss'
+  standalone: true,
+  templateUrl: './transactions.component.html',
+  styleUrls: ['./transactions.component.scss']
 })
-export class Transactions {
-
-}
+export class TransactionsComponent { }
