@@ -1,8 +1,9 @@
 import { Routes } from '@angular/router';
-import { TransactionsComponent } from './features/transactions/transactions.component';
+import { LoginComponent } from '@shared/login/login.component';
+import { TransactionsListComponent } from '@features/transactions/list/transactions-list.component';
 
 export const routes: Routes = [
-  { path: 'transactions', component: TransactionsComponent },
-  { path: '', redirectTo: '/transactions', pathMatch: 'full' },
-  { path: '**', redirectTo: '/transactions' }
+  { path: '', component: LoginComponent },
+  { path: 'transactions', component: TransactionsListComponent },
+  { path: '**', redirectTo: '' }
 ];
