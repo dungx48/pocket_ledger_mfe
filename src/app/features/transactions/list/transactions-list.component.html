@@ -1,0 +1,15 @@
+<h2>Danh sách giao dịch</h2>
+<button (click)="toggleForm()">Thêm giao dịch mới</button>
+<app-transaction-form
+  *ngIf="showForm"
+  (created)="onCreated()">
+</app-transaction-form>
+
+<table>
+  <tr><th>Số tiền</th><th>Mô tả</th><th>Ngày</th></tr>
+  <tr *ngFor="let tx of transactions">
+    <td>{{ tx.amount }}</td>
+    <td>{{ tx.description }}</td>
+    <td>{{ tx.date }}</td>
+  </tr>
+</table>
