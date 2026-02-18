@@ -1,0 +1,14 @@
+services:
+  web:
+    image: ${IMAGE:-ghcr.io/your-org/pocket_ledger_mfe_v0:latest}
+    container_name: pocket-ledger-web
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      API_BASE_URL: ${API_BASE_URL}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
