@@ -1,0 +1,15 @@
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <div>
+    <label>Số tiền</label>
+    <input formControlName="amount" type="number" />
+  </div>
+  <div>
+    <label>Mô tả</label>
+    <input formControlName="description" type="text" />
+  </div>
+  <div>
+    <label>Ngày</label>
+    <input formControlName="date" type="date" />
+  </div>
+  <button type="submit">Lưu</button>
+</form>
