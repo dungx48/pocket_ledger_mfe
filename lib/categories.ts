@@ -44,7 +44,7 @@ export function parseTransactionTypes(data: CategoryItem[]): Category[] {
 export function getCategoriesFromCache(): Category[] {
   if (typeof window === 'undefined') return [];
   const cached = localStorage.getItem(CACHE_KEY_CATEGORIES);
-  console.log('[v0] getCategoriesFromCache - stored value:', cached);
+  console.log('[app] getCategoriesFromCache - stored value:', cached);
   return cached ? JSON.parse(cached) : [];
 }
 
@@ -52,31 +52,31 @@ export function getCategoriesFromCache(): Category[] {
 export function getTransactionTypesFromCache(): Category[] {
   if (typeof window === 'undefined') return [];
   const cached = localStorage.getItem(CACHE_KEY_TRANSACTION_TYPES);
-  console.log('[v0] getTransactionTypesFromCache - stored value:', cached);
+  console.log('[app] getTransactionTypesFromCache - stored value:', cached);
   return cached ? JSON.parse(cached) : [];
 }
 
 // Save categories to localStorage
 export function saveCategoriesCache(categories: Category[]): void {
   if (typeof window === 'undefined') return;
-  console.log('[v0] Saving categories to localStorage:', categories);
+  console.log('[app] Saving categories to localStorage:', categories);
   localStorage.setItem(CACHE_KEY_CATEGORIES, JSON.stringify(categories));
 }
 
 // Save transaction types to localStorage
 export function saveTransactionTypesCache(types: Category[]): void {
   if (typeof window === 'undefined') return;
-  console.log('[v0] Saving transaction types to localStorage:', types);
+  console.log('[app] Saving transaction types to localStorage:', types);
   localStorage.setItem(CACHE_KEY_TRANSACTION_TYPES, JSON.stringify(types));
 }
 
 // Save all categories data to cache
 export function saveCategoriesData(data: CategoryItem[]): void {
-  console.log('[v0] saveCategoriesData called with:', data);
+  console.log('[app] saveCategoriesData called with:', data);
   const categories = parseCategories(data);
   const transactionTypes = parseTransactionTypes(data);
-  console.log('[v0] Parsed categories:', categories);
-  console.log('[v0] Parsed transaction types:', transactionTypes);
+  console.log('[app] Parsed categories:', categories);
+  console.log('[app] Parsed transaction types:', transactionTypes);
   saveCategoriesCache(categories);
   saveTransactionTypesCache(transactionTypes);
 }

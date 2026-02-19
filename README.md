@@ -37,7 +37,7 @@ pnpm install
 Dự án dùng:
 
 - `.env.local` cho local
-- `.env.prod` cho production
+- `.env` cho production
 
 Chi tiết: `ENV_SETUP.md`.
 
@@ -123,53 +123,30 @@ Muốn thêm danh mục mới: cập nhật dữ liệu backend `/categories` (k
 - `PROJECT_STRUCTURE.md`: cấu trúc thư mục.
 - `ENV_SETUP.md`: cấu hình môi trường.
 
-## Docker production
+## Docker Compose (local/server)
 
-### Build image local
-
-```bash
-docker build \
-  --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:5001 \
-  -t pocket-ledger:local .
-```
-
-### Run container local
+### Chạy local
 
 ```bash
-docker run --rm -p 3000:3000 \
-  -e API_BASE_URL=http://localhost:5001 \
-  -e NEXT_PUBLIC_API_BASE_URL=http://localhost:5001 \
-  pocket-ledger:local
+docker compose up -d --build
 ```
+
+App chạy ở `http://localhost:3000`.
 
 ## CI/CD bằng GitHub Actions
 
-Repo đã có workflow: `.github/workflows/cicd.yml`
+Repo dùng workflow `.github/workflows/cicd.yml` theo mô hình self-hosted runner.
 
 Flow:
 
 1. Push vào `main`.
-2. GitHub Actions build Docker image và push lên GHCR:
-   - `ghcr.io/<owner>/<repo>:latest`
-   - `ghcr.io/<owner>/<repo>:<commit-sha>`
-3. Action SSH vào server, tạo/cập nhật `.env.prod`, rồi:
-   - `docker compose pull`
-   - `docker compose up -d`
-
-### Secrets cần tạo trong GitHub repo
-
-- `NEXT_PUBLIC_API_BASE_URL` (dùng build-time + runtime)
-- `API_BASE_URL` (runtime, server-side fetch)
-- `SERVER_HOST`
-- `SERVER_PORT` (ví dụ `22`)
-- `SERVER_USER`
-- `SERVER_SSH_KEY` (private key để SSH)
-- `SERVER_APP_DIR` (ví dụ `/opt/pocket_ledger_mfe_v0`)
-- `SERVER_GHCR_USERNAME`
-- `SERVER_GHCR_TOKEN` (PAT có quyền đọc package GHCR)
+2. Runner (chạy trực tiếp trên server) checkout code.
+3. Workflow đồng bộ source vào `~/apps/pocket_ledger_mfe`.
+4. Chạy `docker compose up -d --build --remove-orphans`.
 
 ### Yêu cầu trên server
 
 - Cài Docker + Docker Compose plugin.
-- User deploy có quyền chạy `docker`.
+- User chạy runner có quyền chạy `docker`.
+- Đã cài và start GitHub self-hosted runner cho repo này.
 - Mở port `3000` hoặc đặt reverse proxy (Nginx/Caddy) phía trước.

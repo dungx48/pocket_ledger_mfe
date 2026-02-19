@@ -106,7 +106,7 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
     const cachedTransactionTypes = getTransactionTypesFromCache();
 
     if (cachedCategories.length > 0 && cachedTransactionTypes.length > 0) {
-      console.log('[v0] Categories loaded from cache');
+      console.log('[app] Categories loaded from cache');
       setCategories(cachedCategories);
       setTransactionTypes(cachedTransactionTypes);
       setLoading(false);
@@ -116,23 +116,23 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
     // Fetch from API if not cached
     const loadCategories = async () => {
       try {
-        console.log('[v0] Fetching categories from API...');
+        console.log('[app] Fetching categories from API...');
         const data = await fetchCategories();
-        console.log('[v0] Categories API response:', data);
+        console.log('[app] Categories API response:', data);
         
         saveCategoriesData(data);
 
         const newCategories = getCategoriesFromCache();
         const newTransactionTypes = getTransactionTypesFromCache();
 
-        console.log('[v0] Parsed categories:', newCategories);
-        console.log('[v0] Parsed transaction types:', newTransactionTypes);
+        console.log('[app] Parsed categories:', newCategories);
+        console.log('[app] Parsed transaction types:', newTransactionTypes);
 
         setCategories(newCategories);
         setTransactionTypes(newTransactionTypes);
       } catch (err) {
-        console.error('[v0] Failed to load categories from API:', err);
-        console.log('[v0] Using mock data as fallback...');
+        console.error('[app] Failed to load categories from API:', err);
+        console.log('[app] Using mock data as fallback...');
         
         // Use mock data as fallback
         saveCategoriesData(MOCK_DATA);
