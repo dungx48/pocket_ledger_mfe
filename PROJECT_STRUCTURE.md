@@ -1,7 +1,7 @@
 # Cấu Trúc Thư Mục
 
 ```
-pocket_ledger_mfe_v0/
+pocket_ledger_mfe/
 ├── app/
 │   ├── layout.tsx
 │   ├── page.tsx

@@ -61,11 +61,6 @@ pnpm build
 NODE_ENV=production pnpm build
 ```
 
-**Hoặc nếu deploy lên Vercel/hosting:**
-1. Thêm environment variables vào dashboard (NEXT_PUBLIC_API_BASE_URL)
-2. Hoặc copy nội dung `.env.prod` vào environment variables
-3. Deploy bình thường
-
 **Kiểm tra:**
 - App chạy trên production server (domain của bạn)
 - API call sẽ gửi tới `http://15.235.185.158:5001`

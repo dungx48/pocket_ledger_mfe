@@ -10,7 +10,6 @@ const _geistMono = Geist_Mono({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Quản Lý Chi Tiêu',
   description: 'Ứng dụng quản lý chi tiêu cá nhân đơn giản và hiệu quả',
-  generator: 'v0.app',
 }
 
 export default function RootLayout({
