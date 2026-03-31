@@ -36,7 +36,7 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
   };
   const parseThousandInput = (value: string) => Number(value.replace(/\./g, ''));
 
-  // Set form values khi edit / create
+  // Set form values khi edit
   useEffect(() => {
     if (initialData) {
       setAmount(formatThousandInput(String(Math.round(initialData.amount / 1000))));
@@ -44,9 +44,16 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
       setCategoryKey(initialData.category_key);
       setTransactionType(initialData.transaction_type);
       setNote(initialData.note || '');
-    } else {
-      const today = new Date().toISOString().split('T')[0];
-      setDate(today);
+    }
+  }, [initialData]);
+
+  // Set default values khi tạo mới (chỉ chạy 1 lần khi categories/transactionTypes được load)
+  useEffect(() => {
+    if (!initialData) {
+      // Dùng local date thay vì UTC để tránh lỗi timezone
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      setDate(localDate);
 
       if (categories.length > 0 && !categoryKey) {
         setCategoryKey(categories[0].key);
@@ -56,7 +63,8 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
         setTransactionType(preferredType?.key || transactionTypes[0].key);
       }
     }
-  }, [initialData, categories, transactionTypes, categoryKey, transactionType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, categories, transactionTypes]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -87,8 +95,10 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
           const preferredType = transactionTypes.find((type) => type.key === 'expense');
           setTransactionType(preferredType?.key || transactionTypes[0].key);
         }
-        const today = new Date().toISOString().split('T')[0];
-        setDate(today);
+        // Dùng local date thay vì UTC để tránh lỗi timezone
+        const now = new Date();
+        const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        setDate(localDate);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi khi lưu giao dịch');

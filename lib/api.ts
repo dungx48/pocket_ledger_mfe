@@ -40,6 +40,15 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   });
 
+  // Xử lý 401 Unauthorized - token hết hạn hoặc không hợp lệ
+  if (response.status === 401) {
+    clearAuthToken();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Phiên đăng nhập đã hết hạn');
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Unknown error' }));
     throw new Error(error.detail || error.message || 'API Error');
