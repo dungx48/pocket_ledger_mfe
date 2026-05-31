@@ -1,5 +1,7 @@
 import { config } from './config';
 import type { CategoryItem } from './categories';
+import type { TransactionType } from './transaction-types';
+import { normalizeTransactionType } from './transaction-types';
 
 const API_BASE = config.apiBaseUrl;
 
@@ -22,12 +24,62 @@ export const clearAuthToken = () => {
   localStorage.removeItem('auth_token');
 };
 
+export type Transaction = {
+  id: string;
+  user_id?: string;
+  amount: number;
+  date: string;
+  category_key: string;
+  transaction_type: TransactionType;
+  note?: string | null;
+  created_at?: string;
+};
+
+export type TransactionCreate = {
+  amount: number;
+  date: string;
+  category_key: string;
+  transaction_type: TransactionType;
+  note?: string | null;
+};
+
+export type TransactionUpdate = Partial<TransactionCreate>;
+
+export type TransactionListParams = {
+  dateFrom?: string;
+  dateTo?: string;
+  skip?: number;
+  limit?: number;
+};
+
+export type MonthlyTransactionSummary = {
+  month: string;
+  expense: number;
+  income: number;
+  transaction_count: number;
+};
+
+export type WeeklyTransactionSummary = {
+  week_start: string;
+  week_end: string;
+  expense: number;
+  income: number;
+  transaction_count: number;
+};
+
+function normalizeTransaction(data: Transaction): Transaction {
+  return {
+    ...data,
+    transaction_type: normalizeTransactionType(data.transaction_type),
+  };
+}
+
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${API_BASE}${endpoint}`;
 
   // ✅ KHÔNG set cứng Content-Type = json nữa
-  const headers: HeadersInit = {
-    ...(options.headers || {}),
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> | undefined),
   };
 
   const token = getAuthToken();
@@ -83,21 +135,73 @@ export const login = (username: string, password: string) => {
 
 // Transactions (giữ JSON)
 export const listTransactions = (skip: number = 0, limit: number = 100) => {
-  return apiCall(`/transactions/?skip=${skip}&limit=${limit}`, { method: 'GET' });
+  return apiCall(`/transactions/?skip=${skip}&limit=${limit}`, { method: 'GET' }).then((data) =>
+    Array.isArray(data) ? data.map(normalizeTransaction) : [],
+  );
+};
+
+export const listTransactionsByDateRange = ({
+  dateFrom,
+  dateTo,
+  skip = 0,
+  limit = 100,
+}: TransactionListParams = {}) => {
+  const params = new URLSearchParams({
+    skip: String(skip),
+    limit: String(limit),
+  });
+
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+
+  return apiCall(`/transactions/?${params.toString()}`, { method: 'GET' }).then((data) =>
+    Array.isArray(data) ? data.map(normalizeTransaction) : [],
+  );
+};
+
+export const fetchMonthlyTransactionSummary = (dateFrom?: string, dateTo?: string) => {
+  const params = new URLSearchParams();
+
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+
+  const query = params.toString();
+
+  return apiCall(`/transactions/summary/monthly${query ? `?${query}` : ''}`, {
+    method: 'GET',
+  }).then((data) => (Array.isArray(data) ? (data as MonthlyTransactionSummary[]) : []));
+};
+
+export const fetchWeeklyTransactionSummary = (dateFrom: string, dateTo: string) => {
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+
+  return apiCall(`/transactions/summary/weekly?${params.toString()}`, { method: 'GET' }).then((data) =>
+    Array.isArray(data) ? (data as WeeklyTransactionSummary[]) : [],
+  );
 };
 
 export const createTransaction = (data: TransactionCreate) => {
   return apiJson('/transactions/', {
     method: 'POST',
-    body: JSON.stringify(data),
-  });
+    body: JSON.stringify({
+      ...data,
+      transaction_type: normalizeTransactionType(data.transaction_type),
+    }),
+  }).then(normalizeTransaction);
 };
 
 export const updateTransaction = (id: string, data: TransactionUpdate) => {
   return apiJson(`/transactions/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+    body: JSON.stringify(
+      data.transaction_type
+        ? { ...data, transaction_type: normalizeTransactionType(data.transaction_type) }
+        : data,
+    ),
+  }).then(normalizeTransaction);
 };
 
 export const deleteTransaction = (id: string) => {

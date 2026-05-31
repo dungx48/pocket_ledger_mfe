@@ -75,7 +75,7 @@ type Transaction = {
   amount: number; // VND
   date: string; // YYYY-MM-DD
   category_key: string;
-  transaction_type: string; // ví dụ: '1' = thu
+  transaction_type: 'income' | 'expense';
   note?: string;
 };
 

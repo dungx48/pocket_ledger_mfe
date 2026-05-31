@@ -1,3 +1,5 @@
+import { normalizeTransactionType, TRANSACTION_TYPES } from './transaction-types';
+
 // Category types
 export interface CategoryItem {
   id: string;
@@ -10,6 +12,7 @@ export interface CategoryItem {
 }
 
 export interface Category {
+  id?: string;
   key: string;
   description: string;
   value: string;
@@ -23,6 +26,7 @@ export function parseCategories(data: CategoryItem[]): Category[] {
   return data
     .filter((item) => item.field_name === 'category_key' && item.is_active === '1')
     .map((item) => ({
+      id: item.id,
       key: item.key,
       description: item.description,
       value: item.value,
@@ -31,13 +35,37 @@ export function parseCategories(data: CategoryItem[]): Category[] {
 
 // Parse transaction types from API response
 export function parseTransactionTypes(data: CategoryItem[]): Category[] {
-  return data
+  const parsed = data
     .filter((item) => item.field_name === 'transaction_type' && item.is_active === '1')
     .map((item) => ({
-      key: item.key,
+      id: item.id,
+      key: normalizeTransactionType(item.key || item.value),
       description: item.description,
-      value: item.value,
+      value: normalizeTransactionType(item.value || item.key),
     }));
+
+  const byKey = new Map<string, Category>();
+  for (const item of parsed) {
+    byKey.set(item.key, item);
+  }
+
+  if (!byKey.has(TRANSACTION_TYPES.income)) {
+    byKey.set(TRANSACTION_TYPES.income, {
+      key: TRANSACTION_TYPES.income,
+      description: 'Thu nhập',
+      value: TRANSACTION_TYPES.income,
+    });
+  }
+
+  if (!byKey.has(TRANSACTION_TYPES.expense)) {
+    byKey.set(TRANSACTION_TYPES.expense, {
+      key: TRANSACTION_TYPES.expense,
+      description: 'Chi tiêu',
+      value: TRANSACTION_TYPES.expense,
+    });
+  }
+
+  return Array.from(byKey.values());
 }
 
 // Get categories from localStorage or empty array

@@ -8,6 +8,7 @@ import {
   getTransactionTypesFromCache,
   saveCategoriesData,
 } from '@/lib/categories';
+import { TRANSACTION_TYPES } from '@/lib/transaction-types';
 
 interface CategoriesContextType {
   categories: Category[];
@@ -23,8 +24,8 @@ const MOCK_DATA = [
   {
     id: '1',
     description: 'Thu nhập',
-    key: 'income',
-    value: 'income',
+    key: TRANSACTION_TYPES.income,
+    value: TRANSACTION_TYPES.income,
     is_active: '1',
     table_name: 'categories',
     field_name: 'transaction_type',
@@ -32,8 +33,8 @@ const MOCK_DATA = [
   {
     id: '2',
     description: 'Chi tiêu',
-    key: 'expense',
-    value: 'expense',
+    key: TRANSACTION_TYPES.expense,
+    value: TRANSACTION_TYPES.expense,
     is_active: '1',
     table_name: 'categories',
     field_name: 'transaction_type',
@@ -105,7 +106,9 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
     const cachedCategories = getCategoriesFromCache();
     const cachedTransactionTypes = getTransactionTypesFromCache();
 
-    if (cachedCategories.length > 0 && cachedTransactionTypes.length > 0) {
+    const hasCategoryIds = cachedCategories.every((category) => category.id);
+
+    if (cachedCategories.length > 0 && cachedTransactionTypes.length > 0 && hasCategoryIds) {
       console.log('[app] Categories loaded from cache');
       setCategories(cachedCategories);
       setTransactionTypes(cachedTransactionTypes);
