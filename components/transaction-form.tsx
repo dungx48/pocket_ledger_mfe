@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { Transaction, TransactionCreate, TransactionUpdate } from '@/lib/api';
 import { useCategories } from '@/app/categories-provider';
+import { normalizeTransactionType, TRANSACTION_TYPES } from '@/lib/transaction-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -42,7 +43,7 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
       setAmount(formatThousandInput(String(Math.round(initialData.amount / 1000))));
       setDate(initialData.date);
       setCategoryKey(initialData.category_key);
-      setTransactionType(initialData.transaction_type);
+      setTransactionType(normalizeTransactionType(initialData.transaction_type));
       setNote(initialData.note || '');
     }
   }, [initialData]);
@@ -59,8 +60,8 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
         setCategoryKey(categories[0].key);
       }
       if (transactionTypes.length > 0 && !transactionType) {
-        const preferredType = transactionTypes.find((type) => type.key === 'expense');
-        setTransactionType(preferredType?.key || transactionTypes[0].key);
+        const preferredType = transactionTypes.find((type) => type.key === TRANSACTION_TYPES.expense);
+        setTransactionType(preferredType?.key || normalizeTransactionType(transactionTypes[0].key));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,7 +81,7 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
         amount: parsedAmount * 1000,
         date,
         category_key: categoryKey,
-        transaction_type: transactionType,
+        transaction_type: normalizeTransactionType(transactionType),
         ...(note && { note }),
       };
       await onSubmit(data);
@@ -92,8 +93,8 @@ export function TransactionForm({ onSubmit, initialData, loading, onCancel }: Pr
           setCategoryKey(categories[0].key);
         }
         if (transactionTypes.length > 0) {
-          const preferredType = transactionTypes.find((type) => type.key === 'expense');
-          setTransactionType(preferredType?.key || transactionTypes[0].key);
+          const preferredType = transactionTypes.find((type) => type.key === TRANSACTION_TYPES.expense);
+          setTransactionType(preferredType?.key || normalizeTransactionType(transactionTypes[0].key));
         }
         // Dùng local date thay vì UTC để tránh lỗi timezone
         const now = new Date();

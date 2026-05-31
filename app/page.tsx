@@ -1,82 +1,263 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  listTransactions,
+  addDays,
+  compareDesc,
+  endOfMonth,
+  format,
+  parseISO,
+  startOfMonth,
+  subDays,
+} from 'date-fns';
+import {
   createTransaction,
-  updateTransaction,
   deleteTransaction,
+  fetchMonthlyTransactionSummary,
+  fetchWeeklyTransactionSummary,
   getAuthToken,
   clearAuthToken,
+  listTransactionsByDateRange,
+  MonthlyTransactionSummary,
   Transaction,
+  updateTransaction,
+  WeeklyTransactionSummary,
 } from '@/lib/api';
 import { TransactionForm } from '@/components/transaction-form';
 import { TransactionList } from '@/components/transaction-list';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut } from 'lucide-react';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 100;
+const DEFAULT_WINDOW_DAYS = 7;
+
+type SelectedRange =
+  | { type: 'default'; page: number }
+  | { type: 'month'; monthKey: string }
+  | { type: 'week'; monthKey: string; weekIndex: number };
+
+type DateRange = {
+  dateFrom: string;
+  dateTo: string;
+};
+
+type WeekSummary = {
+  index: number;
+  start: Date;
+  end: Date;
+  expense: number;
+  transactionCount: number;
+};
+
+type MonthSummary = {
+  key: string;
+  start: Date;
+  end: Date;
+  expense: number;
+  transactionCount: number;
+};
+
+function parseTransactionDate(transaction: Transaction) {
+  return parseISO(transaction.date.slice(0, 10));
+}
+
+function sortTransactions(transactions: Transaction[]) {
+  return [...transactions].sort((a, b) => compareDesc(parseTransactionDate(a), parseTransactionDate(b)));
+}
+
+function formatDateParam(date: Date) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function getDefaultWindowRange(page: number): DateRange {
+  const end = subDays(new Date(), page * DEFAULT_WINDOW_DAYS);
+  const start = subDays(end, DEFAULT_WINDOW_DAYS - 1);
+
+  return {
+    dateFrom: formatDateParam(start),
+    dateTo: formatDateParam(end),
+  };
+}
+
+function getDefaultAccumulatedRange(page: number): DateRange {
+  const end = new Date();
+  const start = subDays(end, (page + 1) * DEFAULT_WINDOW_DAYS - 1);
+
+  return {
+    dateFrom: formatDateParam(start),
+    dateTo: formatDateParam(end),
+  };
+}
+
+function getMonthRange(monthKey: string): DateRange {
+  const start = startOfMonth(parseISO(`${monthKey}-01`));
+  const end = endOfMonth(start);
+
+  return {
+    dateFrom: formatDateParam(start),
+    dateTo: formatDateParam(end),
+  };
+}
+
+function formatCurrency(amount: number) {
+  return `${amount.toLocaleString('vi-VN')}đ`;
+}
+
+function formatDayRange(start: Date, end: Date) {
+  return `${format(start, 'dd/MM')} - ${format(end, 'dd/MM')}`;
+}
+
+function mapMonthSummary(summary: MonthlyTransactionSummary): MonthSummary {
+  const start = startOfMonth(parseISO(`${summary.month}-01`));
+
+  return {
+    key: summary.month,
+    start,
+    end: endOfMonth(start),
+    expense: summary.expense,
+    transactionCount: summary.transaction_count,
+  };
+}
+
+function mapWeekSummary(summary: WeeklyTransactionSummary, index: number): WeekSummary {
+  return {
+    index,
+    start: parseISO(summary.week_start),
+    end: parseISO(summary.week_end),
+    expense: summary.expense,
+    transactionCount: summary.transaction_count,
+  };
+}
+
+async function fetchAllTransactionsInRange(range: DateRange) {
+  const transactions: Transaction[] = [];
+  let skip = 0;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const items = await listTransactionsByDateRange({
+      dateFrom: range.dateFrom,
+      dateTo: range.dateTo,
+      skip,
+      limit: PAGE_SIZE,
+    });
+
+    transactions.push(...items);
+    skip += items.length;
+    hasNextPage = items.length === PAGE_SIZE;
+  }
+
+  return sortTransactions(transactions);
+}
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [monthlySummaries, setMonthlySummaries] = useState<MonthSummary[]>([]);
+  const [weeklySummariesByMonth, setWeeklySummariesByMonth] = useState<Record<string, WeekSummary[]>>({});
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedRange, setSelectedRange] = useState<SelectedRange>({ type: 'default', page: 0 });
+  const [expandedMonthKey, setExpandedMonthKey] = useState<string | null>(null);
+  const initialLoadStartedRef = useRef(false);
+  const weeklySummaryRequestsRef = useRef<Partial<Record<string, Promise<WeekSummary[]>>>>({});
   const router = useRouter();
 
-  // Check auth
   useEffect(() => {
+    if (initialLoadStartedRef.current) return;
+
     const token = getAuthToken();
     if (!token) {
       router.push('/login');
-    } else {
-      loadTransactions(true);
+      return;
     }
+
+    initialLoadStartedRef.current = true;
+    loadInitialData();
   }, [router]);
 
-  const loadTransactions = async (reset: boolean = false) => {
-    if (reset) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+  const loadMonthlySummaries = async () => {
+    const summaries = await fetchMonthlyTransactionSummary();
+    setMonthlySummaries(summaries.map(mapMonthSummary));
+  };
 
-    const skip = reset ? 0 : offset;
+  const loadWeeklySummaries = async (monthKey: string) => {
+    if (weeklySummariesByMonth[monthKey]) return weeklySummariesByMonth[monthKey];
+    if (weeklySummaryRequestsRef.current[monthKey]) return weeklySummaryRequestsRef.current[monthKey];
+
+    const monthRange = getMonthRange(monthKey);
+    const request = fetchWeeklyTransactionSummary(monthRange.dateFrom, monthRange.dateTo)
+      .then((summaries) => {
+        const weeks = summaries.map(mapWeekSummary);
+
+        setWeeklySummariesByMonth((prev) => ({ ...prev, [monthKey]: weeks }));
+        return weeks;
+      })
+      .finally(() => {
+        delete weeklySummaryRequestsRef.current[monthKey];
+      });
+
+    weeklySummaryRequestsRef.current[monthKey] = request;
+    return request;
+  };
+
+  const loadInitialData = async () => {
+    setLoading(true);
+
     try {
-      const data = await listTransactions(skip, PAGE_SIZE);
-      const items = Array.isArray(data) ? data : [];
+      const [summaries, defaultTransactions] = await Promise.all([
+        fetchMonthlyTransactionSummary(),
+        fetchAllTransactionsInRange(getDefaultWindowRange(0)),
+      ]);
 
-      setHasMore(items.length === PAGE_SIZE);
-      setOffset(skip + items.length);
-      setTransactions((prev) => (reset ? items : [...prev, ...items]));
+      setMonthlySummaries(summaries.map(mapMonthSummary));
+      setTransactions(defaultTransactions);
+      setSelectedRange({ type: 'default', page: 0 });
     } catch (err) {
-      console.error('Failed to load transactions:', err);
+      console.error('Failed to load dashboard data:', err);
     } finally {
-      if (reset) {
-        setLoading(false);
-      } else {
-        setLoadingMore(false);
-      }
+      setLoading(false);
     }
+  };
+
+  const reloadCurrentTransactions = async (range: SelectedRange = selectedRange) => {
+    if (range.type === 'month') {
+      setTransactions(await fetchAllTransactionsInRange(getMonthRange(range.monthKey)));
+      return;
+    }
+
+    if (range.type === 'week') {
+      const weeks = await loadWeeklySummaries(range.monthKey);
+      const week = weeks[range.weekIndex];
+      if (!week) {
+        setTransactions([]);
+        return;
+      }
+
+      setTransactions(
+        await fetchAllTransactionsInRange({
+          dateFrom: formatDateParam(week.start),
+          dateTo: formatDateParam(week.end),
+        }),
+      );
+      return;
+    }
+
+    setTransactions(await fetchAllTransactionsInRange(getDefaultAccumulatedRange(range.page)));
   };
 
   const handleCreateOrUpdate = async (formData: any) => {
     try {
       if (editingId) {
         await updateTransaction(editingId, formData);
-        setTransactions((prev) =>
-          prev.map((t) => (t.id === editingId ? { ...t, ...formData } : t))
-        );
         setEditingId(null);
       } else {
-        const newTxn = await createTransaction(formData);
-        setTransactions((prev) => [newTxn, ...prev.slice(0, PAGE_SIZE - 1)]);
-        setOffset((prev) => Math.max(prev, PAGE_SIZE));
+        await createTransaction(formData);
       }
+
+      await Promise.all([loadMonthlySummaries(), reloadCurrentTransactions()]);
       setShowForm(false);
     } catch (err) {
       console.error('Failed to save transaction:', err);
@@ -89,8 +270,7 @@ export default function Dashboard() {
 
     try {
       await deleteTransaction(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
-      setOffset((prev) => Math.max(0, prev - 1));
+      await Promise.all([loadMonthlySummaries(), reloadCurrentTransactions()]);
     } catch (err) {
       console.error('Failed to delete transaction:', err);
     }
@@ -101,65 +281,145 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  const editingTransaction = transactions.find((t) => t.id === editingId);
-  const isIncomeTransaction = (transactionType: unknown) =>
-    transactionType === '1' || transactionType === 1 || transactionType === 'income';
-  const totalIncome = transactions
-    .filter((t) => isIncomeTransaction(t.transaction_type))
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = transactions
-    .filter((t) => !isIncomeTransaction(t.transaction_type))
-    .reduce((sum, t) => sum + t.amount, 0);
-  const balance = totalIncome - totalExpense;
+  const handleSelectMonth = async (month: MonthSummary, expanded: boolean) => {
+    const isSelectedMonth = selectedRange.type !== 'default' && selectedRange.monthKey === month.key;
+
+    if (expanded) {
+      setExpandedMonthKey(null);
+      return;
+    }
+
+    setExpandedMonthKey(month.key);
+
+    if (isSelectedMonth) {
+      if (!weeklySummariesByMonth[month.key]) {
+        setLoading(true);
+        try {
+          await loadWeeklySummaries(month.key);
+        } catch (err) {
+          console.error('Failed to load weekly summary:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+      return;
+    }
+
+    const nextRange: SelectedRange = { type: 'month', monthKey: month.key };
+
+    setSelectedRange(nextRange);
+    setLoading(true);
+
+    try {
+      await Promise.all([
+        fetchAllTransactionsInRange(getMonthRange(month.key)).then(setTransactions),
+        loadWeeklySummaries(month.key),
+      ]);
+    } catch (err) {
+      console.error('Failed to load month data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectWeek = async (monthKey: string, week: WeekSummary) => {
+    const nextRange: SelectedRange = { type: 'week', monthKey, weekIndex: week.index };
+
+    setSelectedRange(nextRange);
+    setLoading(true);
+
+    try {
+      setTransactions(
+        await fetchAllTransactionsInRange({
+          dateFrom: formatDateParam(week.start),
+          dateTo: formatDateParam(week.end),
+        }),
+      );
+    } catch (err) {
+      console.error('Failed to load week transactions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetRecent = async () => {
+    const nextRange: SelectedRange = { type: 'default', page: 0 };
+
+    setSelectedRange(nextRange);
+    setLoading(true);
+
+    try {
+      setTransactions(await fetchAllTransactionsInRange(getDefaultWindowRange(0)));
+    } catch (err) {
+      console.error('Failed to load recent transactions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadPreviousDays = async () => {
+    if (selectedRange.type !== 'default') return;
+
+    const nextPage = selectedRange.page + 1;
+    setLoadingMore(true);
+
+    try {
+      const olderTransactions = await fetchAllTransactionsInRange(getDefaultWindowRange(nextPage));
+      setTransactions((prev) => sortTransactions([...prev, ...olderTransactions]));
+      setSelectedRange({ type: 'default', page: nextPage });
+    } catch (err) {
+      console.error('Failed to load previous transactions:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const editingTransaction = transactions.find((transaction) => transaction.id === editingId);
+
+  const hasMoreDefaultDays = useMemo(() => {
+    if (selectedRange.type !== 'default' || monthlySummaries.length === 0) return false;
+
+    const currentRange = getDefaultAccumulatedRange(selectedRange.page);
+    const oldestMonth = monthlySummaries[monthlySummaries.length - 1];
+
+    return parseISO(currentRange.dateFrom) > oldestMonth.start;
+  }, [monthlySummaries, selectedRange]);
+
+  const listTitle = useMemo(() => {
+    if (selectedRange.type === 'month') {
+      const month = monthlySummaries.find((item) => item.key === selectedRange.monthKey);
+      return month ? `Giao dịch tháng ${format(month.start, 'MM/yyyy')}` : 'Giao dịch';
+    }
+
+    if (selectedRange.type === 'week') {
+      const week = weeklySummariesByMonth[selectedRange.monthKey]?.[selectedRange.weekIndex];
+      return week
+        ? `Giao dịch tuần ${week.index + 1} (${formatDayRange(week.start, week.end)})`
+        : 'Giao dịch';
+    }
+
+    const range = getDefaultAccumulatedRange(selectedRange.page);
+    return `Giao dịch gần đây (${formatDayRange(parseISO(range.dateFrom), parseISO(range.dateTo))})`;
+  }, [monthlySummaries, selectedRange, weeklySummariesByMonth]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <header className="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white shadow-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <h1 className="text-2xl font-bold text-gray-900">Quản Lý Chi Tiêu</h1>
           <Button
             onClick={handleLogout}
             variant="outline"
             className="text-gray-700 hover:bg-gray-100"
           >
-            <LogOut className="w-4 h-4 mr-2" />
+            <LogOut className="mr-2 h-4 w-4" />
             Đăng xuất
           </Button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-700 font-medium mb-1">Thu nhập</p>
-            <p className="text-2xl font-bold text-green-600">
-              {totalIncome.toLocaleString('vi-VN')}đ
-            </p>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-700 font-medium mb-1">Chi tiêu</p>
-            <p className="text-2xl font-bold text-red-600">
-              {totalExpense.toLocaleString('vi-VN')}đ
-            </p>
-          </div>
-          <div
-            className={`${
-              balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'
-            } border rounded-lg p-4`}
-          >
-            <p className={`text-sm font-medium mb-1 ${balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-              Số dư
-            </p>
-            <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-              {balance.toLocaleString('vi-VN')}đ
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form */}
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
             {showForm || editingId ? (
               <TransactionForm
@@ -172,35 +432,122 @@ export default function Dashboard() {
                 }}
               />
             ) : (
-              <Button
-                onClick={() => setShowForm(true)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-6 text-lg"
-              >
-                + Thêm giao dịch
-              </Button>
+              <div className="space-y-4">
+                <Button
+                  onClick={() => setShowForm(true)}
+                  className="w-full bg-indigo-600 py-6 text-lg font-medium text-white hover:bg-indigo-700"
+                >
+                  + Thêm giao dịch
+                </Button>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-base font-semibold text-gray-900">Thống kê theo tháng</h2>
+                    {selectedRange.type !== 'default' && (
+                      <Button type="button" variant="outline" size="sm" onClick={handleResetRecent}>
+                        Gần đây
+                      </Button>
+                    )}
+                  </div>
+
+                  {monthlySummaries.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">Chưa có dữ liệu thống kê.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {monthlySummaries.map((month) => {
+                        const expanded = expandedMonthKey === month.key;
+                        const selected = selectedRange.type !== 'default' && selectedRange.monthKey === month.key;
+                        const weeks = weeklySummariesByMonth[month.key] || [];
+
+                        return (
+                          <div
+                            key={month.key}
+                            className={`rounded-lg border ${
+                              selected ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+                              onClick={() => handleSelectMonth(month, expanded)}
+                            >
+                              <div className="min-w-0">
+                                <p className="font-semibold text-gray-950">
+                                  Tháng {format(month.start, 'MM/yyyy')}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {month.transactionCount} giao dịch
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <span className="font-bold text-red-600">{formatCurrency(month.expense)}</span>
+                                {expanded ? (
+                                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                                )}
+                              </div>
+                            </button>
+
+                            {expanded && (
+                              <div className="space-y-1 border-t border-gray-200 px-2 py-2">
+                                {weeks.map((week) => {
+                                  const weekSelected =
+                                    selectedRange.type === 'week' &&
+                                    selectedRange.monthKey === month.key &&
+                                    selectedRange.weekIndex === week.index;
+
+                                  return (
+                                    <button
+                                      key={`${month.key}-${week.index}`}
+                                      type="button"
+                                      className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm ${
+                                        weekSelected
+                                          ? 'bg-indigo-100 text-indigo-900'
+                                          : 'text-gray-700 hover:bg-gray-50'
+                                      }`}
+                                      onClick={() => handleSelectWeek(month.key, week)}
+                                    >
+                                      <span>
+                                        Tuần {week.index + 1} ({formatDayRange(week.start, week.end)})
+                                      </span>
+                                      <span className="shrink-0 font-semibold text-red-600">
+                                        {formatCurrency(week.expense)}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
-          {/* List */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold mb-4 text-gray-900">Giao dịch gần đây</h2>
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">{listTitle}</h2>
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Đang tải...</div>
+                <div className="py-8 text-center text-gray-500">Đang tải...</div>
               ) : (
                 <>
                   <TransactionList
                     transactions={transactions}
-                    onEdit={(txn) => setEditingId(txn.id)}
+                    onEdit={(transaction) => setEditingId(transaction.id)}
                     onDelete={handleDelete}
                     loading={loading || loadingMore}
                   />
-                  {hasMore && (
+                  {hasMoreDefaultDays && (
                     <div className="mt-4 flex justify-center">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => loadTransactions(false)}
+                        onClick={handleLoadPreviousDays}
                         disabled={loadingMore}
                       >
                         {loadingMore ? 'Đang tải thêm...' : 'Xem thêm'}
