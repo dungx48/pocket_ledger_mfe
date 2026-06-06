@@ -1,27 +1,24 @@
 export const TRANSACTION_TYPES = {
-  income: 'income',
-  expense: 'expense',
+  income: '1',
+  expense: '2',
 } as const;
 
 export type TransactionType = (typeof TRANSACTION_TYPES)[keyof typeof TRANSACTION_TYPES];
 
-const INCOME_VALUES = new Set(['income', '1', 'thu', 'in']);
-const EXPENSE_VALUES = new Set(['expense', '2', 'chi', 'out']);
+export function isTransactionType(value: unknown): value is TransactionType {
+  const normalized = String(value ?? '').trim();
+  return normalized === TRANSACTION_TYPES.income || normalized === TRANSACTION_TYPES.expense;
+}
 
 export function normalizeTransactionType(value: unknown): TransactionType {
-  const normalized = String(value ?? '').trim().toLowerCase();
-
-  if (INCOME_VALUES.has(normalized)) {
-    return TRANSACTION_TYPES.income;
+  const normalized = String(value ?? '').trim();
+  if (isTransactionType(normalized)) {
+    return normalized;
   }
 
-  if (EXPENSE_VALUES.has(normalized)) {
-    return TRANSACTION_TYPES.expense;
-  }
-
-  return TRANSACTION_TYPES.expense;
+  throw new Error('transaction_type must be 1 or 2');
 }
 
 export function isIncomeTransaction(value: unknown): boolean {
-  return normalizeTransactionType(value) === TRANSACTION_TYPES.income;
+  return String(value ?? '').trim() === TRANSACTION_TYPES.income;
 }

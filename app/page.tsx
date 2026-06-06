@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   addDays,
@@ -27,7 +28,7 @@ import {
 import { TransactionForm } from '@/components/transaction-form';
 import { TransactionList } from '@/components/transaction-list';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, LogOut } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, LogOut, ReceiptText } from 'lucide-react';
 
 const PAGE_SIZE = 100;
 const DEFAULT_WINDOW_DAYS = 7;
@@ -405,8 +406,22 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Chi Tiêu</h1>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Quản Lý Chi Tiêu</h1>
+            <nav className="mt-2 flex gap-2">
+              <Button size="sm" className="bg-indigo-600 text-white hover:bg-indigo-700">
+                <ReceiptText className="mr-2 h-4 w-4" />
+                Giao dịch
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/analytics">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Thống kê
+                </Link>
+              </Button>
+            </nav>
+          </div>
           <Button
             onClick={handleLogout}
             variant="outline"

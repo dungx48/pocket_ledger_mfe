@@ -1,152 +1,138 @@
-# Quản Lý Chi Tiêu Cá Nhân
+# Pocket Ledger Frontend
 
-Ứng dụng web quản lý thu chi cá nhân, xây dựng với Next.js 16, TypeScript, Tailwind CSS và shadcn/ui.
+Frontend web cua Pocket Ledger, xay dung bang Next.js 16, React 19, TypeScript, Tailwind CSS va shadcn/Radix UI.
 
-## Tính năng chính
+## Main Features
 
-- Đăng nhập bằng `username/password` (OAuth2 password flow).
-- CRUD giao dịch.
-- Phân loại theo:
-  - `transaction_type` (thu/chi).
-  - `category_key` (danh mục chi tiết).
-- Danh mục và loại giao dịch lấy từ API `/categories`, cache localStorage.
-- Form nhập số tiền theo **đơn vị nghìn**:
-  - người dùng nhập `1234` => hiển thị `1.234`.
-  - khi submit gửi `1,234,000` VND.
-- Dashboard hiển thị:
-  - Tổng thu nhập.
-  - Tổng chi tiêu.
-  - Số dư.
-- Danh sách “Giao dịch gần đây” dùng `Load more` theo trang (không render vô hạn).
+- Login bang `username/password` qua backend `POST /auth/token`.
+- CRUD giao dich thu/chi.
+- Danh muc va loai giao dich lay tu `GET /categories`, cache vao localStorage.
+- Form nhap tien theo don vi nghin:
+  - User nhap `1.234`.
+  - Submit len backend la `1234000` VND.
+- Man hinh giao dich co thong ke theo thang/tuan/ngay va danh sach giao dich theo date range.
+- Man hinh analytics moi de thong ke va phan tich tieu dung.
 
-## Yêu cầu
+## Routes
+
+- `/login`: login page.
+- `/`: authenticated transaction workspace.
+- `/analytics`: analytics and spending analysis page.
+
+## Analytics Page
+
+Route `/analytics` dung cac API backend sau:
+
+- `GET /transactions/analytics/overview`
+- `GET /transactions/analytics/by-category`
+- `GET /transactions/analytics/timeseries`
+
+Filter hien co:
+
+- `date_from`
+- `date_to`
+- `transaction_type`
+- `category_key`
+
+Nguyen tac:
+
+- Khong get all transactions ve frontend de tu tong hop analytics.
+- Backend la noi filter va aggregate so lieu.
+- `category_key` la optional filter. Neu bo trong thi analytics lay tat ca danh muc.
+- Ten hien thi cua category lay tu `CategoriesProvider`/`GET /categories`.
+
+## Requirements
 
 - Node.js 18+
 - pnpm
 
-## Chạy dự án
+## Run
 
-### 1) Cài dependencies
+Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-### 2) Cấu hình môi trường
-
-Dự án dùng:
-
-- `.env.local` cho local
-- `.env` cho production
-
-Chi tiết: `ENV_SETUP.md`.
-
-### 3) Development
+Development:
 
 ```bash
 pnpm dev
 ```
 
-App chạy ở `http://localhost:3000`.
+App mac dinh chay tai:
 
-### 4) Build/Start
+```text
+http://localhost:3000
+```
+
+Build:
 
 ```bash
 pnpm build
-NODE_ENV=production pnpm start
 ```
 
-## Kiến trúc nhanh
+Start production build:
 
-- `app/page.tsx`: dashboard, thống kê, phân trang `Load more`.
-- `app/categories-provider.tsx`: load/cache danh mục + transaction types.
-- `components/transaction-form.tsx`: form thêm/sửa giao dịch.
-- `components/transaction-list.tsx`: list giao dịch + badge danh mục + dấu +/- theo `transaction_type`.
-- `lib/api.ts`: auth + API calls.
-- `lib/categories.ts`: parse/cache danh mục.
+```bash
+pnpm start
+```
 
-## Data contract hiện tại
+## Environment
 
-> Backend thực tế là nguồn sự thật. Interface dưới đây phản ánh cách app đang dùng.
+Frontend doc API base URL tu:
+
+- Browser: `NEXT_PUBLIC_API_BASE_URL`
+- Fallback: `http://localhost:5001`
+
+Chi tiet xem `ENV_SETUP.md`.
+
+## Key Files
+
+- `app/page.tsx`: transaction workspace, month/week/day transaction loading.
+- `app/analytics/page.tsx`: analytics UI and filters.
+- `app/login/page.tsx`: login page.
+- `app/categories-provider.tsx`: category and transaction type provider/cache.
+- `components/transaction-form.tsx`: create/update transaction form.
+- `components/transaction-list.tsx`: transaction list.
+- `lib/api.ts`: auth helpers and API client functions.
+- `lib/categories.ts`: parse/cache categories.
+- `lib/transaction-types.ts`: canonical transaction type helpers.
+
+## Data Contract Used By Frontend
 
 ```ts
 type Transaction = {
   id: string;
-  amount: number; // VND
-  date: string; // YYYY-MM-DD
-  category_key: string;
-  transaction_type: 'income' | 'expense';
-  note?: string;
-};
-
-type TransactionCreate = {
-  amount: number; // VND
+  user_id?: string;
+  amount: number;
   date: string;
   category_key: string;
-  transaction_type: string;
-  note?: string;
+  transaction_type: 'income' | 'expense';
+  note?: string | null;
+  created_at?: string;
 };
 ```
 
-## Danh mục và loại giao dịch
+Analytics types are declared in `lib/api.ts`:
 
-- Nguồn dữ liệu: API `/categories`.
-- Parse tại `lib/categories.ts`:
-  - `field_name === 'category_key'` => danh mục.
-  - `field_name === 'transaction_type'` => loại giao dịch.
-- Cache keys:
-  - `app_categories`
-  - `app_transaction_types`
+- `AnalyticsOverview`
+- `AnalyticsByCategory`
+- `AnalyticsTimeseries`
 
-Muốn thêm danh mục mới: cập nhật dữ liệu backend `/categories` (không hard-code trong form).
+## Related Docs
 
-## UI/UX hiện tại
+- Root API contract: `../docs/api-contract.md`
+- Analytics task: `../docs/TASK_ANALYTICS_APP_SHELL.md`
+- Transaction summary task: `../docs/TASK_TRANSACTION_SUMMARY.md`
+- Frontend architecture: `ARCHITECTURE.md`
+- Project structure: `PROJECT_STRUCTURE.md`
+- Environment setup: `ENV_SETUP.md`
 
-- `Số tiền (nghìn đ)` có hậu tố `000`, nhập có dấu chấm phân tách.
-- Trong list giao dịch:
-  - badge hiển thị tên danh mục.
-  - dòng dưới chỉ hiển thị ghi chú (không lặp danh mục).
-- Dấu tiền `+/-` và tính tổng thu/chi dựa theo `transaction_type`.
-
-## Troubleshooting
-
-- Lỗi lock khi chạy dev:
-  - `Unable to acquire lock ... .next/dev/lock`
-  - nguyên nhân: có instance `next dev` cũ đang chạy.
-- Lỗi danh mục `undefined`:
-  - kiểm tra cache `app_categories` có dữ liệu.
-  - kiểm tra transaction trả về có `category_key`.
-
-## Tài liệu liên quan
-
-- `ARCHITECTURE.md`: kiến trúc chi tiết.
-- `PROJECT_STRUCTURE.md`: cấu trúc thư mục.
-- `ENV_SETUP.md`: cấu hình môi trường.
-
-## Docker Compose (local/server)
-
-### Chạy local
+## Docker Compose
 
 ```bash
 docker compose up -d --build
 ```
 
-App chạy ở `http://localhost:3000`.
-
-## CI/CD bằng GitHub Actions
-
-Repo dùng workflow `.github/workflows/cicd.yml` theo mô hình self-hosted runner.
-
-Flow:
-
-1. Push vào `main`.
-2. Runner (chạy trực tiếp trên server) checkout code.
-3. Workflow đồng bộ source vào `~/apps/pocket_ledger_mfe`.
-4. Chạy `docker compose up -d --build --remove-orphans`.
-
-### Yêu cầu trên server
-
-- Cài Docker + Docker Compose plugin.
-- User chạy runner có quyền chạy `docker`.
-- Đã cài và start GitHub self-hosted runner cho repo này.
-- Mở port `3000` hoặc đặt reverse proxy (Nginx/Caddy) phía trước.
+Container exposes frontend port `3000`.

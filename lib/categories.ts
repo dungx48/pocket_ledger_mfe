@@ -1,4 +1,4 @@
-import { normalizeTransactionType, TRANSACTION_TYPES } from './transaction-types';
+import { isTransactionType, normalizeTransactionType, TRANSACTION_TYPES } from './transaction-types';
 
 // Category types
 export interface CategoryItem {
@@ -37,11 +37,12 @@ export function parseCategories(data: CategoryItem[]): Category[] {
 export function parseTransactionTypes(data: CategoryItem[]): Category[] {
   const parsed = data
     .filter((item) => item.field_name === 'transaction_type' && item.is_active === '1')
+    .filter((item) => isTransactionType(item.key))
     .map((item) => ({
       id: item.id,
-      key: normalizeTransactionType(item.key || item.value),
+      key: normalizeTransactionType(item.key),
       description: item.description,
-      value: normalizeTransactionType(item.value || item.key),
+      value: normalizeTransactionType(item.key),
     }));
 
   const byKey = new Map<string, Category>();
@@ -81,7 +82,15 @@ export function getTransactionTypesFromCache(): Category[] {
   if (typeof window === 'undefined') return [];
   const cached = localStorage.getItem(CACHE_KEY_TRANSACTION_TYPES);
   console.log('[app] getTransactionTypesFromCache - stored value:', cached);
-  return cached ? JSON.parse(cached) : [];
+  if (!cached) return [];
+
+  return (JSON.parse(cached) as Category[])
+    .filter((item) => isTransactionType(item.key))
+    .map((item) => ({
+      ...item,
+      key: normalizeTransactionType(item.key),
+      value: normalizeTransactionType(item.key),
+    }));
 }
 
 // Save categories to localStorage

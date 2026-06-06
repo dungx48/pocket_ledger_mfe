@@ -1,70 +1,87 @@
-# Cấu Trúc Thư Mục
+# Project Structure
 
-```
+```text
 pocket_ledger_mfe/
-├── app/
-│   ├── layout.tsx
-│   ├── page.tsx
-│   ├── categories-provider.tsx
-│   ├── globals.css
-│   └── login/
-│       └── page.tsx
-│
-├── components/
-│   ├── transaction-form.tsx
-│   ├── transaction-list.tsx
-│   ├── theme-provider.tsx
-│   └── ui/
-│       └── ...shadcn components
-│
-├── lib/
-│   ├── api.ts
-│   ├── categories.ts
-│   ├── config.ts
-│   └── utils.ts
-│
-├── hooks/
-├── public/
-├── styles/
-├── ARCHITECTURE.md
-├── ENV_SETUP.md
-├── README.md
-└── PROJECT_STRUCTURE.md
+  app/
+    layout.tsx
+    page.tsx
+    categories-provider.tsx
+    globals.css
+    analytics/
+      page.tsx
+    login/
+      page.tsx
+  components/
+    transaction-form.tsx
+    transaction-list.tsx
+    theme-provider.tsx
+    ui/
+      ...shadcn components
+  hooks/
+  lib/
+    api.ts
+    categories.ts
+    config.ts
+    transaction-types.ts
+    utils.ts
+  public/
+  styles/
+  ARCHITECTURE.md
+  ENV_SETUP.md
+  README.md
+  PROJECT_STRUCTURE.md
 ```
 
-## Mô tả nhanh
+## `app/`
 
-### `app/`
+- `layout.tsx`: root layout and `CategoriesProvider`.
+- `page.tsx`: transaction workspace.
+- `analytics/page.tsx`: spending analytics workspace.
+- `login/page.tsx`: login page.
+- `categories-provider.tsx`: category and transaction type context.
 
-- `page.tsx`: dashboard, CRUD giao dịch, thống kê, load-more pagination.
-- `categories-provider.tsx`: load/cache categories + transaction types.
-- `login/page.tsx`: đăng nhập.
+## `components/`
 
-### `components/`
+- `transaction-form.tsx`: create/update transaction form.
+- `transaction-list.tsx`: transaction list, category badge, edit/delete controls.
+- `ui/`: shadcn/Radix UI primitives.
 
-- `transaction-form.tsx`: form thêm/sửa giao dịch.
-  - nhập tiền theo đơn vị nghìn.
-  - submit payload chuẩn `amount`, `category_key`, `transaction_type`.
-- `transaction-list.tsx`: danh sách giao dịch gần đây.
-  - badge danh mục lấy từ provider.
-  - dấu +/- theo `transaction_type`.
+## `lib/`
 
-### `lib/`
+- `api.ts`: API client, auth token helpers, transaction APIs, summary APIs and analytics APIs.
+- `categories.ts`: parse and cache category data.
+- `config.ts`: resolves API base URL.
+- `transaction-types.ts`: canonical transaction type helpers.
+- `utils.ts`: common UI helpers.
 
-- `api.ts`: API client, token management, endpoint functions.
-- `categories.ts`: parse và cache dữ liệu danh mục.
-- `config.ts`: đọc API base URL từ env.
-- `utils.ts`: helper chung.
+## Main Dependency Flow
 
-## Luồng phụ thuộc chính
+- `app/page.tsx` -> `components/transaction-form.tsx`, `components/transaction-list.tsx`, `lib/api.ts`.
+- `app/analytics/page.tsx` -> `lib/api.ts`, `app/categories-provider.tsx`.
+- `components/transaction-form.tsx` -> `app/categories-provider.tsx`.
+- `components/transaction-list.tsx` -> `app/categories-provider.tsx`.
+- `app/categories-provider.tsx` -> `lib/categories.ts`, `lib/api.ts`.
 
-- `app/page.tsx` -> `components/transaction-form.tsx` + `components/transaction-list.tsx`.
-- `components/*` -> `lib/api.ts` (qua callbacks hoặc type).
-- `components/transaction-form.tsx` + `components/transaction-list.tsx` -> `app/categories-provider.tsx`.
-- `app/categories-provider.tsx` -> `lib/categories.ts` + `lib/api.ts`.
+## Update Checklist
 
-## Các điểm cần đồng bộ khi đổi nghiệp vụ
+When changing transaction schema:
 
-- Đổi schema transaction: cập nhật `lib/api.ts`, `app/page.tsx`, `components/transaction-form.tsx`, `components/transaction-list.tsx`.
-- Đổi logic danh mục/loại giao dịch: cập nhật `lib/categories.ts` và `app/categories-provider.tsx`.
-- Đổi pagination: cập nhật `app/page.tsx` và tài liệu `README.md`, `ARCHITECTURE.md`.
+- Update `lib/api.ts`.
+- Update `components/transaction-form.tsx`.
+- Update `components/transaction-list.tsx`.
+- Update `app/page.tsx` if display or filtering changes.
+- Update root docs in `../docs`.
+
+When changing analytics contract:
+
+- Update `lib/api.ts`.
+- Update `app/analytics/page.tsx`.
+- Update `../docs/api-contract.md`.
+- Update backend docs in `../pocket_ledger_mcrs`.
+
+When adding a new authenticated module:
+
+- Add a route under `app/`.
+- Reuse auth/token helpers from `lib/api.ts`.
+- Keep navigation consistent with `/` and `/analytics`.
+- Consider extracting shared shell/layout only when duplication becomes meaningful.
