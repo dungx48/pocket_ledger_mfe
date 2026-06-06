@@ -67,6 +67,45 @@ export type WeeklyTransactionSummary = {
   transaction_count: number;
 };
 
+export type AnalyticsOverview = {
+  date_from: string;
+  date_to: string;
+  income: number;
+  expense: number;
+  balance: number;
+  transaction_count: number;
+};
+
+export type AnalyticsByCategory = {
+  category_key: string;
+  amount: number;
+  transaction_count: number;
+  percentage: number;
+};
+
+export type AnalyticsTimeseries = {
+  period: string;
+  income: number;
+  expense: number;
+  balance: number;
+  transaction_count: number;
+};
+
+export type AnalyticsByCategoryParams = {
+  dateFrom: string;
+  dateTo: string;
+  transactionType?: TransactionType | 'all';
+  categoryKey?: string;
+};
+
+export type AnalyticsTimeseriesParams = {
+  dateFrom: string;
+  dateTo: string;
+  groupBy?: 'day' | 'week' | 'month';
+  transactionType?: TransactionType | 'all';
+  categoryKey?: string;
+};
+
 function normalizeTransaction(data: Transaction): Transaction {
   return {
     ...data,
@@ -181,6 +220,71 @@ export const fetchWeeklyTransactionSummary = (dateFrom: string, dateTo: string) 
   return apiCall(`/transactions/summary/weekly?${params.toString()}`, { method: 'GET' }).then((data) =>
     Array.isArray(data) ? (data as WeeklyTransactionSummary[]) : [],
   );
+};
+
+export const fetchAnalyticsOverview = (
+  dateFrom: string,
+  dateTo: string,
+  transactionType?: TransactionType | 'all',
+  categoryKey?: string,
+) => {
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+
+  if (transactionType && transactionType !== 'all') {
+    params.set('transaction_type', normalizeTransactionType(transactionType));
+  }
+  if (categoryKey) params.set('category_key', categoryKey);
+
+  return apiCall(`/transactions/analytics/overview?${params.toString()}`, {
+    method: 'GET',
+  }).then((data) => data as AnalyticsOverview);
+};
+
+export const fetchAnalyticsByCategory = ({
+  dateFrom,
+  dateTo,
+  transactionType,
+  categoryKey,
+}: AnalyticsByCategoryParams) => {
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+
+  if (transactionType && transactionType !== 'all') {
+    params.set('transaction_type', normalizeTransactionType(transactionType));
+  }
+  if (categoryKey) params.set('category_key', categoryKey);
+
+  return apiCall(`/transactions/analytics/by-category?${params.toString()}`, {
+    method: 'GET',
+  }).then((data) => (Array.isArray(data) ? (data as AnalyticsByCategory[]) : []));
+};
+
+export const fetchAnalyticsTimeseries = ({
+  dateFrom,
+  dateTo,
+  groupBy = 'day',
+  transactionType,
+  categoryKey,
+}: AnalyticsTimeseriesParams) => {
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+    group_by: groupBy,
+  });
+
+  if (transactionType && transactionType !== 'all') {
+    params.set('transaction_type', normalizeTransactionType(transactionType));
+  }
+  if (categoryKey) params.set('category_key', categoryKey);
+
+  return apiCall(`/transactions/analytics/timeseries?${params.toString()}`, {
+    method: 'GET',
+  }).then((data) => (Array.isArray(data) ? (data as AnalyticsTimeseries[]) : []));
 };
 
 export const createTransaction = (data: TransactionCreate) => {
