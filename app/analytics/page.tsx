@@ -17,6 +17,7 @@ import {
 } from '@/lib/api';
 import { TRANSACTION_TYPES, TransactionType } from '@/lib/transaction-types';
 import { useCategories } from '@/app/categories-provider';
+import type { Category } from '@/lib/categories';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,8 +63,12 @@ function formatCurrency(amount: number) {
   return `${amount.toLocaleString('vi-VN')}d`;
 }
 
-function getCategoryName(categories: { key: string; description: string }[], key: string) {
-  return categories.find((category) => category.key === key)?.description || key;
+function getCategoryName(categories: Category[], key: string) {
+  return (
+    categories.find(
+      (category) => category.id === key || category.key === key || category.value === key,
+    )?.description || key
+  );
 }
 
 export default function AnalyticsPage() {

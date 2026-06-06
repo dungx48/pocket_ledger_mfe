@@ -113,10 +113,9 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
       setCategories(cachedCategories);
       setTransactionTypes(cachedTransactionTypes);
       setLoading(false);
-      return;
     }
 
-    // Fetch from API if not cached
+    // Always refresh from API so stale localStorage does not hide server category changes.
     const loadCategories = async () => {
       try {
         console.log('[app] Fetching categories from API...');
